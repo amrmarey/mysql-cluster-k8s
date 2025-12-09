@@ -1,0 +1,97 @@
+# ============================================================================
+# MySQL Cluster Service Configuration
+# ============================================================================
+# Purpose: Expose MySQL cluster services for external access
+# Note: The operator automatically creates services, but you can customize them
+# ============================================================================
+
+---
+# Headless service for direct pod access (StatefulSet requirement)
+# This is auto-created by the operator, shown here for reference
+apiVersion: v1
+kind: Service
+metadata:
+  name: mycluster-instances
+  namespace: mysql-cluster
+  labels:
+    app.kubernetes.io/name: mysql-cluster
+    app.kubernetes.io/component: database
+  annotations:
+    description: "Headless service for MySQL cluster instances"
+spec:
+  clusterIP: None
+  selector:
+    mysql.oracle.com/cluster: mycluster
+  ports:
+    - name: mysql
+      port: 3306
+      targetPort: 3306
+    - name: mysqlx
+      port: 33060
+      targetPort: 33060
+    - name: gr-xcom
+      port: 33061
+      targetPort: 33061
+
+---
+# LoadBalancer service for external access (optional)
+# Uncomment and modify if you need external access
+# apiVersion: v1
+# kind: Service
+# metadata:
+#   name: mycluster-external
+#   namespace: mysql-cluster
+#   labels:
+#     app.kubernetes.io/name: mysql-cluster
+#     app.kubernetes.io/component: router
+#   annotations:
+#     description: "External access to MySQL cluster via Router"
+# spec:
+#   type: LoadBalancer
+#   selector:
+#     component: mysqlrouter
+#     mysql.oracle.com/cluster: mycluster
+#   ports:
+#     - name: mysql-rw
+#       port: 3306
+#       targetPort: 6446
+#       protocol: TCP
+#     - name: mysql-ro
+#       port: 3307
+#       targetPort: 6447
+#       protocol: TCP
+#     - name: mysqlx-rw
+#       port: 33060
+#       targetPort: 6448
+#       protocol: TCP
+#     - name: mysqlx-ro
+#       port: 33061
+#       targetPort: 6449
+#       protocol: TCP
+
+---
+# NodePort service for development/testing (optional)
+# Uncomment if you need NodePort access
+# apiVersion: v1
+# kind: Service
+# metadata:
+#   name: mycluster-nodeport
+#   namespace: mysql-cluster
+#   labels:
+#     app.kubernetes.io/name: mysql-cluster
+#     app.kubernetes.io/component: router
+# spec:
+#   type: NodePort
+#   selector:
+#     component: mysqlrouter
+#     mysql.oracle.com/cluster: mycluster
+#   ports:
+#     - name: mysql-rw
+#       port: 6446
+#       targetPort: 6446
+#       nodePort: 30306
+#     - name: mysql-ro
+#       port: 6447
+#       targetPort: 6447
+#       nodePort: 30307
+

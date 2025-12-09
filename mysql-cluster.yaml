@@ -1,0 +1,139 @@
+# ============================================================================
+# MySQL InnoDB Cluster Configuration
+# ============================================================================
+# Version: MySQL 8.4 LTS (Long Term Support)
+# Operator: Oracle MySQL Operator for Kubernetes v2.1.9
+# ============================================================================
+
+---
+apiVersion: mysql.oracle.com/v2
+kind: InnoDBCluster
+metadata:
+  name: mycluster
+  namespace: mysql-cluster
+  labels:
+    app.kubernetes.io/name: mysql-cluster
+    app.kubernetes.io/component: database
+    app.kubernetes.io/version: "8.4.7"
+    app.kubernetes.io/managed-by: mysql-operator
+    environment: production
+  annotations:
+    description: "Production MySQL InnoDB Cluster with 3 instances"
+spec:
+  # Secret containing root credentials
+  secretName: mysql-cluster-secret
+
+  # TLS Configuration - Self-signed for internal communication
+  tlsUseSelfSigned: true
+
+  # Number of MySQL instances (1 primary + 2 secondaries)
+  instances: 3
+
+  # MySQL version - using LTS release
+  version: "8.4.7"
+
+  # MySQL Server configuration
+  mycnf: |
+    [mysqld]
+    # Performance tuning
+    max_connections=500
+    innodb_buffer_pool_size=1G
+    innodb_log_file_size=256M
+    innodb_flush_log_at_trx_commit=1
+    innodb_flush_method=O_DIRECT
+
+    # Character set
+    character_set_server=utf8mb4
+    collation_server=utf8mb4_unicode_ci
+
+    # Slow query logging
+    slow_query_log=ON
+    slow_query_log_file=/var/lib/mysql/slow.log
+    long_query_time=2
+
+    # Security
+    local_infile=OFF
+    skip_symbolic_links=ON
+
+    # Group Replication optimizations
+    group_replication_consistency=BEFORE_ON_PRIMARY_FAILOVER
+
+  # Data directory configuration with persistent storage
+  datadirVolumeClaimTemplate:
+    storageClassName: standard # Adjust based on your cluster's storage class
+    accessModes:
+      - ReadWriteOnce
+    resources:
+      requests:
+        storage: 20Gi
+
+  # Pod template customization
+  podSpec:
+    containers:
+      - name: mysql
+        resources:
+          requests:
+            cpu: "500m"
+            memory: "2Gi"
+          limits:
+            cpu: "2"
+            memory: "4Gi"
+        # Security context for container
+        # securityContext:
+        #   runAsNonRoot: true
+        #   allowPrivilegeEscalation: false
+        #   readOnlyRootFilesystem: false
+    # Pod-level configurations
+    affinity:
+      podAntiAffinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  mysql.oracle.com/cluster: mycluster
+              topologyKey: kubernetes.io/hostname
+    # Tolerations for specific node taints
+    # tolerations:
+    #   - key: "database"
+    #     operator: "Equal"
+    #     value: "mysql"
+    #     effect: "NoSchedule"
+
+  # MySQL Router configuration for load balancing and failover
+  router:
+    instances: 2 # 2 router instances for high availability
+    podSpec:
+      containers:
+        - name: router
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+    # Router affinity - spread across nodes
+    # affinity:
+    #   podAntiAffinity:
+    #     preferredDuringSchedulingIgnoredDuringExecution:
+    #       - weight: 100
+    #         podAffinityTerm:
+    #           labelSelector:
+    #             matchLabels:
+    #               component: mysqlrouter
+    #           topologyKey: kubernetes.io/hostname
+
+  # Backup configuration (optional - requires additional setup)
+  # backupProfiles:
+  #   - name: daily-backup
+  #     dumpInstance:
+  #       storage:
+  #         persistentVolumeClaim:
+  #           claimName: mysql-backup-pvc
+
+  # backupSchedules:
+  #   - name: daily-backup-schedule
+  #     schedule: "0 2 * * *"  # Daily at 2 AM
+  #     backupProfileName: daily-backup
+  #     enabled: true

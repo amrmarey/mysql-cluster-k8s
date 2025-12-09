@@ -1,0 +1,71 @@
+# ============================================================================
+# MySQL Cluster Namespace Configuration
+# ============================================================================
+# Purpose: Dedicated namespace for MySQL InnoDB Cluster with proper isolation
+# ============================================================================
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: mysql-cluster
+  labels:
+    app.kubernetes.io/name: mysql-cluster
+    app.kubernetes.io/component: database
+    app.kubernetes.io/managed-by: mysql-operator
+    environment: production
+  annotations:
+    description: "Dedicated namespace for MySQL InnoDB Cluster"
+    owner: "database-team"
+    created-by: "kubernetes-manifests"
+
+---
+# Resource Quota - Prevent resource monopolization
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: mysql-cluster-quota
+  namespace: mysql-cluster
+  labels:
+    app.kubernetes.io/name: mysql-cluster
+spec:
+  hard:
+    requests.cpu: "8"
+    requests.memory: "16Gi"
+    limits.cpu: "16"
+    limits.memory: "32Gi"
+    persistentvolumeclaims: "10"
+    pods: "20"
+    services: "10"
+    secrets: "20"
+    configmaps: "20"
+
+---
+# Limit Range - Default resource constraints for containers
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: mysql-cluster-limits
+  namespace: mysql-cluster
+  labels:
+    app.kubernetes.io/name: mysql-cluster
+spec:
+  limits:
+    - type: Container
+      default:
+        cpu: "1"
+        memory: "2Gi"
+      defaultRequest:
+        cpu: "500m"
+        memory: "1Gi"
+      min:
+        cpu: "100m"
+        memory: "256Mi"
+      max:
+        cpu: "4"
+        memory: "8Gi"
+    - type: PersistentVolumeClaim
+      min:
+        storage: "1Gi"
+      max:
+        storage: "100Gi"

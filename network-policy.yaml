@@ -1,0 +1,128 @@
+# ============================================================================
+# Network Policies for MySQL Cluster
+# ============================================================================
+# Purpose: Restrict network traffic to MySQL cluster pods
+# ============================================================================
+
+---
+# Default deny all ingress and egress
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: mysql-cluster
+  labels:
+    app.kubernetes.io/name: mysql-cluster
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+
+---
+# Allow DNS resolution (required for cluster operations)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dns
+  namespace: mysql-cluster
+  labels:
+    app.kubernetes.io/name: mysql-cluster
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+
+---
+# Allow MySQL cluster internal communication
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: mysql-cluster-internal
+  namespace: mysql-cluster
+  labels:
+    app.kubernetes.io/name: mysql-cluster
+spec:
+  podSelector:
+    matchLabels:
+      mysql.oracle.com/cluster: mycluster
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow traffic from other MySQL cluster pods
+    - from:
+        - podSelector:
+            matchLabels:
+              mysql.oracle.com/cluster: mycluster
+      ports:
+        - protocol: TCP
+          port: 3306 # MySQL client port
+        - protocol: TCP
+          port: 33060 # MySQL X Protocol
+        - protocol: TCP
+          port: 33061 # Group Replication
+    # Allow traffic from MySQL Router
+    - from:
+        - podSelector:
+            matchLabels:
+              component: mysqlrouter
+      ports:
+        - protocol: TCP
+          port: 3306
+        - protocol: TCP
+          port: 33060
+  egress:
+    # Allow traffic to other MySQL cluster pods
+    - to:
+        - podSelector:
+            matchLabels:
+              mysql.oracle.com/cluster: mycluster
+      ports:
+        - protocol: TCP
+          port: 3306
+        - protocol: TCP
+          port: 33060
+        - protocol: TCP
+          port: 33061
+
+---
+# Allow application access via MySQL Router
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: mysql-router-access
+  namespace: mysql-cluster
+  labels:
+    app.kubernetes.io/name: mysql-cluster
+spec:
+  podSelector:
+    matchLabels:
+      component: mysqlrouter
+  policyTypes:
+    - Ingress
+  ingress:
+    # Allow from any namespace with the mysql-client label
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              mysql-access: "true"
+      ports:
+        - protocol: TCP
+          port: 6446 # Read-Write port
+        - protocol: TCP
+          port: 6447 # Read-Only port
+        - protocol: TCP
+          port: 6448 # X Protocol Read-Write
+        - protocol: TCP
+          port: 6449 # X Protocol Read-Only
