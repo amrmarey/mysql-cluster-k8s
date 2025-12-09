@@ -44,6 +44,30 @@ spec:
           port: 53
 
 ---
+# Allow egress to Kubernetes API server (required for MySQL Operator)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-kube-api
+  namespace: mysql-cluster
+  labels:
+    app.kubernetes.io/name: mysql-cluster
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    # Allow HTTPS to Kubernetes API server
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 6443
+
+---
 # Allow MySQL cluster internal communication
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
